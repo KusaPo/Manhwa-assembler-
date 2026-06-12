@@ -1,0 +1,28 @@
+{
+  "_comment": "Fill in your ElevenLabs API key and voice ID. Other settings have sensible defaults.",
+  
+  "elevenlabs_api_key": "80709a53e5faf03c46cf4ecfb7878e3cbb2b2a2fe84c7d0e5b36700d95099663",
+  "elevenlabs_voice_id": "cQb5fnQsTT1X0GdpmHoo",
+  
+  "video_width": 1920,
+  "video_height": 1080,
+  "fps": 60,
+  
+  "voiceover_volume": 1.0,
+  "bg_music_volume": 0.18,
+  
+  "zoom_intensity": 0.15,
+  "fade_duration": 0.3,
+  
+  "_blur_settings": "Settings for the manhwa-style blurred background fill",
+  "blur_background": true,
+  "blur_radius": 51,
+  "blur_dim": 0.7,
+  "foreground_scale": 0.95,
+  
+  "caption_font": "Arial-Bold",
+  "caption_font_size": 48,
+  "caption_color": "white",
+  "caption_stroke_color": "black",
+  "caption_stroke_width": 3
+}

@@ -1,0 +1,189 @@
+order,file,segment,label,has_text,start_s,end_s,dur_s
+1,001-panel.png,1,S1 Alley/cop fight,True,0.0,2.87,2.87
+2,002-panel.png,1,S1 Alley/cop fight,False,2.87,5.07,2.21
+3,004-panel.png,1,S1 Alley/cop fight,False,5.07,7.28,2.21
+4,006-panel.png,1,S1 Alley/cop fight,False,7.28,9.48,2.21
+5,008-panel.png,1,S1 Alley/cop fight,True,9.48,12.35,2.87
+6,009-panel.png,1,S1 Alley/cop fight,True,12.35,15.22,2.87
+7,011-panel.png,1,S1 Alley/cop fight,True,15.22,18.09,2.87
+8,012-panel.png,1,S1 Alley/cop fight,True,18.09,20.95,2.87
+9,013-panel.png,1,S1 Alley/cop fight,True,20.95,23.82,2.87
+10,014-panel.png,1,S1 Alley/cop fight,True,23.82,26.69,2.87
+11,015-panel.png,1,S1 Alley/cop fight,False,26.69,28.89,2.21
+12,016-panel.png,1,S1 Alley/cop fight,True,28.89,31.76,2.87
+13,017-panel.png,1,S1 Alley/cop fight,True,31.76,34.63,2.87
+14,019-panel.png,1,S1 Alley/cop fight,False,34.63,36.84,2.21
+15,020-panel.png,1,S1 Alley/cop fight,False,36.84,39.04,2.21
+16,023-panel.png,1,S1 Alley/cop fight,False,39.04,41.25,2.21
+17,024-panel.png,1,S1 Alley/cop fight,False,41.25,43.45,2.21
+18,026-panel.png,1,S1 Alley/cop fight,False,43.45,45.66,2.21
+19,027-panel.png,1,S1 Alley/cop fight,True,45.66,48.53,2.87
+20,029-panel.png,1,S1 Alley/cop fight,False,48.53,50.73,2.21
+21,030-panel.png,1,S1 Alley/cop fight,True,50.73,53.6,2.87
+22,032-panel.png,1,S1 Alley/cop fight,False,53.6,55.8,2.21
+23,034-panel.png,1,S1 Alley/cop fight,False,55.8,58.01,2.21
+24,035-panel.png,1,S1 Alley/cop fight,True,58.01,60.88,2.87
+25,037-panel.png,1,S1 Alley/cop fight,False,60.88,63.08,2.21
+26,038-panel.png,1,S1 Alley/cop fight,True,63.08,65.95,2.87
+27,039-panel.png,1,S1 Alley/cop fight,False,65.95,68.16,2.21
+28,040-panel.png,1,S1 Alley/cop fight,True,68.16,71.02,2.87
+29,041-panel.png,1,S1 Alley/cop fight,True,71.02,73.89,2.87
+30,042-panel.png,1,S1 Alley/cop fight,False,73.89,76.1,2.21
+31,043-panel.png,1,S1 Alley/cop fight,False,76.1,78.3,2.21
+32,044-panel.png,1,S1 Alley/cop fight,False,78.3,80.51,2.21
+33,045-panel.png,1,S1 Alley/cop fight,False,80.51,82.71,2.21
+34,046-panel.png,1,S1 Alley/cop fight,False,82.71,84.92,2.21
+35,047-panel.png,1,S1 Alley/cop fight,True,84.92,87.79,2.87
+36,048-panel.png,1,S1 Alley/cop fight,False,87.79,89.99,2.21
+37,049-panel.png,1,S1 Alley/cop fight,False,89.99,92.2,2.21
+38,050-panel.png,1,S1 Alley/cop fight,False,92.2,94.4,2.21
+39,051-panel.png,1,S1 Alley/cop fight,True,94.4,97.27,2.87
+40,052-panel.png,1,S1 Alley/cop fight,False,97.27,99.48,2.21
+41,053-panel.png,1,S1 Alley/cop fight,False,99.48,101.68,2.21
+42,054-panel.png,1,S1 Alley/cop fight,True,101.68,104.55,2.87
+43,055-panel.png,1,S1 Alley/cop fight,False,104.55,106.76,2.21
+44,056-panel.png,1,S1 Alley/cop fight,True,106.76,109.62,2.87
+45,057-panel.png,1,S1 Alley/cop fight,False,109.62,111.83,2.21
+46,058-panel.png,1,S1 Alley/cop fight,True,111.83,114.7,2.87
+47,059-panel.png,1,S1 Alley/cop fight,True,114.7,117.56,2.87
+48,060-panel.png,1,S1 Alley/cop fight,False,117.56,119.77,2.21
+49,061-panel.png,1,S1 Alley/cop fight,True,119.77,122.64,2.87
+50,062-panel.png,1,S1 Alley/cop fight,False,122.64,124.84,2.21
+51,063-panel.png,1,S1 Alley/cop fight,True,124.84,127.71,2.87
+52,064-panel.png,1,S1 Alley/cop fight,False,127.71,129.92,2.21
+53,065-panel.png,1,S1 Alley/cop fight,True,129.92,132.78,2.87
+54,066-panel.png,1,S1 Alley/cop fight,False,132.78,134.99,2.21
+55,067-panel.png,1,S1 Alley/cop fight,False,134.99,137.19,2.21
+56,068-panel.png,1,S1 Alley/cop fight,False,137.19,139.4,2.21
+57,069-panel.png,1,S1 Alley/cop fight,True,139.4,142.27,2.87
+58,070-panel.png,1,S1 Alley/cop fight,False,142.27,144.47,2.21
+59,071-panel.png,1,S1 Alley/cop fight,False,144.47,146.68,2.21
+60,072-panel.png,1,S1 Alley/cop fight,True,146.68,149.55,2.87
+61,073-panel.png,1,S1 Alley/cop fight,True,149.55,152.41,2.87
+62,074-panel.png,1,S1 Alley/cop fight,False,152.41,154.62,2.21
+63,075-panel.png,1,S1 Alley/cop fight,False,154.62,156.83,2.21
+64,076-panel.png,1,S1 Alley/cop fight,False,156.83,159.03,2.21
+65,077-panel.png,1,S1 Alley/cop fight,True,159.03,161.9,2.87
+66,080-panel.png,1,S1 Alley/cop fight,False,161.9,164.1,2.21
+67,081-panel.png,1,S1 Alley/cop fight,False,164.1,166.31,2.21
+68,082-panel.png,1,S1 Alley/cop fight,True,166.31,169.18,2.87
+69,083-panel.png,1,S1 Alley/cop fight,False,169.18,171.38,2.21
+70,084-panel.png,1,S1 Alley/cop fight,False,171.38,173.59,2.21
+71,085-panel.png,1,S1 Alley/cop fight,False,173.59,175.79,2.21
+72,087-panel.png,1,S1 Alley/cop fight,False,175.79,178.0,2.21
+73,089-panel.png,2,S2 Shipping yard/Bang,True,178.0,180.59,2.59
+74,090-panel.png,2,S2 Shipping yard/Bang,True,180.59,183.18,2.59
+75,091-panel.png,2,S2 Shipping yard/Bang,True,183.18,185.77,2.59
+76,093-panel.png,2,S2 Shipping yard/Bang,False,185.77,187.76,1.99
+77,094-panel.png,2,S2 Shipping yard/Bang,True,187.76,190.35,2.59
+78,095-panel.png,2,S2 Shipping yard/Bang,False,190.35,192.34,1.99
+79,096-panel.png,2,S2 Shipping yard/Bang,False,192.34,194.33,1.99
+80,097-panel.png,2,S2 Shipping yard/Bang,False,194.33,196.31,1.99
+81,098-panel.png,2,S2 Shipping yard/Bang,True,196.31,198.9,2.59
+82,099-panel.png,2,S2 Shipping yard/Bang,False,198.9,200.89,1.99
+83,100-panel.png,2,S2 Shipping yard/Bang,False,200.89,202.88,1.99
+84,101-panel.png,2,S2 Shipping yard/Bang,False,202.88,204.87,1.99
+85,103-panel.png,2,S2 Shipping yard/Bang,True,204.87,207.46,2.59
+86,104-panel.png,2,S2 Shipping yard/Bang,False,207.46,209.45,1.99
+87,106-panel.png,2,S2 Shipping yard/Bang,True,209.45,212.04,2.59
+88,107-panel.png,2,S2 Shipping yard/Bang,True,212.04,214.63,2.59
+89,108-panel.png,2,S2 Shipping yard/Bang,True,214.63,217.22,2.59
+90,110-panel.png,2,S2 Shipping yard/Bang,False,217.22,219.21,1.99
+91,111-panel.png,2,S2 Shipping yard/Bang,False,219.21,221.2,1.99
+92,112-panel.png,2,S2 Shipping yard/Bang,False,221.2,223.19,1.99
+93,113-panel.png,2,S2 Shipping yard/Bang,False,223.19,225.18,1.99
+94,114-panel.png,2,S2 Shipping yard/Bang,False,225.18,227.17,1.99
+95,115-panel.png,2,S2 Shipping yard/Bang,True,227.17,229.76,2.59
+96,116-panel.png,2,S2 Shipping yard/Bang,False,229.76,231.75,1.99
+97,117-panel.png,2,S2 Shipping yard/Bang,False,231.75,233.75,1.99
+98,118-panel.png,2,S2 Shipping yard/Bang,False,233.75,235.74,1.99
+99,120-panel.png,2,S2 Shipping yard/Bang,False,235.74,237.73,1.99
+100,121-panel.png,2,S2 Shipping yard/Bang,False,237.73,239.72,1.99
+101,123-panel.png,2,S2 Shipping yard/Bang,True,239.72,242.31,2.59
+102,124-panel.png,2,S2 Shipping yard/Bang,False,242.31,244.3,1.99
+103,125-panel.png,2,S2 Shipping yard/Bang,False,244.3,246.29,1.99
+104,126-panel.png,2,S2 Shipping yard/Bang,False,246.29,248.28,1.99
+105,127-panel.png,2,S2 Shipping yard/Bang,False,248.28,250.27,1.99
+106,128-panel.png,2,S2 Shipping yard/Bang,True,250.27,252.86,2.59
+107,129-panel.png,2,S2 Shipping yard/Bang,True,252.86,255.45,2.59
+108,130-panel.png,2,S2 Shipping yard/Bang,False,255.45,257.44,1.99
+109,132-panel.png,2,S2 Shipping yard/Bang,False,257.44,259.43,1.99
+110,133-panel.png,2,S2 Shipping yard/Bang,True,259.43,262.02,2.59
+111,134-panel.png,2,S2 Shipping yard/Bang,False,262.02,264.01,1.99
+112,136-panel.png,2,S2 Shipping yard/Bang,True,264.01,266.6,2.59
+113,137-panel.png,2,S2 Shipping yard/Bang,True,266.6,269.19,2.59
+114,139-panel.png,2,S2 Shipping yard/Bang,False,269.19,271.18,1.99
+115,141-panel.png,2,S2 Shipping yard/Bang,False,271.18,273.17,1.99
+116,143-panel.png,2,S2 Shipping yard/Bang,True,273.17,275.76,2.59
+117,144-panel.png,2,S2 Shipping yard/Bang,False,275.76,277.75,1.99
+118,146-panel.png,2,S2 Shipping yard/Bang,True,277.75,280.34,2.59
+119,147-panel.png,2,S2 Shipping yard/Bang,True,280.34,282.93,2.59
+120,148-panel.png,2,S2 Shipping yard/Bang,False,282.93,284.92,1.99
+121,149-panel.png,2,S2 Shipping yard/Bang,True,284.92,287.51,2.59
+122,150-panel.png,2,S2 Shipping yard/Bang,True,287.51,290.1,2.59
+123,153-panel.png,2,S2 Shipping yard/Bang,False,290.1,292.09,1.99
+124,154-panel.png,3,S3 Temple/Buddha,True,292.09,295.02,2.93
+125,156-panel.png,3,S3 Temple/Buddha,False,295.02,297.28,2.26
+126,157-panel.png,3,S3 Temple/Buddha,True,297.28,300.22,2.93
+127,158-panel.png,3,S3 Temple/Buddha,False,300.22,302.47,2.26
+128,160-panel.png,3,S3 Temple/Buddha,True,302.47,305.41,2.93
+129,161-panel.png,3,S3 Temple/Buddha,True,305.41,308.34,2.93
+130,163-panel.png,3,S3 Temple/Buddha,False,308.34,310.6,2.26
+131,165-panel.png,3,S3 Temple/Buddha,False,310.6,312.85,2.26
+132,166-panel.png,3,S3 Temple/Buddha,False,312.85,315.11,2.26
+133,168-panel.png,3,S3 Temple/Buddha,True,315.11,318.05,2.93
+134,170-panel.png,3,S3 Temple/Buddha,True,318.05,320.98,2.93
+135,171-panel.png,3,S3 Temple/Buddha,False,320.98,323.24,2.26
+136,173-panel.png,3,S3 Temple/Buddha,False,323.24,325.49,2.26
+137,175-panel.png,3,S3 Temple/Buddha,True,325.49,328.43,2.93
+138,177-panel.png,3,S3 Temple/Buddha,False,328.43,330.68,2.26
+139,178-panel.png,3,S3 Temple/Buddha,True,330.68,333.62,2.93
+140,179-panel.png,3,S3 Temple/Buddha,True,333.62,336.55,2.93
+141,180-panel.png,3,S3 Temple/Buddha,True,336.55,339.49,2.93
+142,181-panel.png,3,S3 Temple/Buddha,False,339.49,341.74,2.26
+143,182-panel.png,3,S3 Temple/Buddha,False,341.74,344.0,2.26
+144,183-panel.png,3,S3 Temple/Buddha,False,344.0,346.26,2.26
+145,184-panel.png,3,S3 Temple/Buddha,False,346.26,348.51,2.26
+146,185-panel.png,3,S3 Temple/Buddha,False,348.51,350.77,2.26
+147,186-panel.png,3,S3 Temple/Buddha,False,350.77,353.03,2.26
+148,188-panel.png,3,S3 Temple/Buddha,False,353.03,355.29,2.26
+149,189-panel.png,3,S3 Temple/Buddha,True,355.29,358.22,2.93
+150,190-panel.png,3,S3 Temple/Buddha,True,358.22,361.15,2.93
+151,191-panel.png,3,S3 Temple/Buddha,True,361.15,364.09,2.93
+152,192-panel.png,3,S3 Temple/Buddha,False,364.09,366.35,2.26
+153,193-panel.png,3,S3 Temple/Buddha,False,366.35,368.6,2.26
+154,194-panel.png,3,S3 Temple/Buddha,True,368.6,371.54,2.93
+155,195-panel.png,3,S3 Temple/Buddha,True,371.54,374.47,2.93
+156,196-panel.png,3,S3 Temple/Buddha,True,374.47,377.4,2.93
+157,197-panel.png,3,S3 Temple/Buddha,False,377.4,379.66,2.26
+158,198-panel.png,3,S3 Temple/Buddha,False,379.66,381.92,2.26
+159,199-panel.png,3,S3 Temple/Buddha,True,381.92,384.85,2.93
+160,200-panel.png,3,S3 Temple/Buddha,False,384.85,387.11,2.26
+161,201-panel.png,3,S3 Temple/Buddha,True,387.11,390.04,2.93
+162,202-panel.png,3,S3 Temple/Buddha,True,390.04,392.98,2.93
+163,204-panel.png,3,S3 Temple/Buddha,True,392.98,395.91,2.93
+164,206-panel.png,3,S3 Temple/Buddha,False,395.91,398.17,2.26
+165,207-panel.png,3,S3 Temple/Buddha,True,398.17,401.1,2.93
+166,209-panel.png,3,S3 Temple/Buddha,False,401.1,403.36,2.26
+167,211-panel.png,3,S3 Temple/Buddha,True,403.36,406.29,2.93
+168,212-panel.png,3,S3 Temple/Buddha,False,406.29,408.55,2.26
+169,213-panel.png,3,S3 Temple/Buddha,False,408.55,410.81,2.26
+170,214-panel.png,3,S3 Temple/Buddha,True,410.81,413.74,2.93
+171,215-panel.png,3,S3 Temple/Buddha,False,413.74,416.0,2.26
+172,218-panel.png,3,S3 Temple/Buddha,True,416.0,418.93,2.93
+173,219-panel.png,3,S3 Temple/Buddha,False,418.93,421.19,2.26
+174,222-panel.png,4,S4 Hospital/reincarnation,True,421.19,426.22,5.03
+175,223-panel.png,4,S4 Hospital/reincarnation,False,426.22,430.08,3.87
+176,225-panel.png,4,S4 Hospital/reincarnation,True,430.08,435.11,5.03
+177,226-panel.png,4,S4 Hospital/reincarnation,False,435.11,438.97,3.87
+178,228-panel.png,4,S4 Hospital/reincarnation,True,438.97,444.0,5.03
+179,229-panel.png,4,S4 Hospital/reincarnation,True,444.0,449.02,5.03
+180,230-panel.png,4,S4 Hospital/reincarnation,True,449.02,454.05,5.03
+181,231-panel.png,4,S4 Hospital/reincarnation,True,454.05,459.07,5.03
+182,233-panel.png,4,S4 Hospital/reincarnation,True,459.07,464.1,5.03
+183,236-panel.png,4,S4 Hospital/reincarnation,True,464.1,469.12,5.03
+184,237-panel.png,4,S4 Hospital/reincarnation,True,469.12,474.15,5.03
+185,239-panel.png,4,S4 Hospital/reincarnation,False,474.15,478.01,3.87
+186,241-panel.png,4,S4 Hospital/reincarnation,True,478.01,483.04,5.03
+187,243-panel.png,4,S4 Hospital/reincarnation,True,483.04,488.06,5.03
+188,244-panel.png,4,S4 Hospital/reincarnation,True,488.06,493.09,5.03

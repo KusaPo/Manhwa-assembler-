@@ -1,0 +1,49 @@
+15:28:10 [assembler] INFO: ============================================================
+15:28:10 [assembler] INFO: MANHWA VIDEO ASSEMBLY - STARTING
+15:28:10 [assembler] INFO: ============================================================
+15:28:10 [validator] INFO:   Script OK: 1253 words (~8.1 min audio)
+15:28:10 [validator] INFO:   Images OK: 188 panels found
+15:28:10 [validator] WARNING:   No music file at input\music.mp3 (optional, will skip)
+15:28:10 [assembler] INFO: [1/6] Parsing script...
+15:28:10 [assembler] INFO:       Found 4 script segments
+15:28:10 [assembler] INFO: [2/6] Skipping voiceover generation (using existing file)
+15:28:10 [pydub.converter] DEBUG: subprocess.call(['ffmpeg', '-y', '-i', 'output\\voiceover.mp3', '-acodec', 'pcm_s16le', '-vn', '-f', 'wav', '-'])
+15:28:10 [assembler] INFO: [3/5] Voiceover duration: 8:27
+15:28:10 [assembler] INFO: [4/5] Captions disabled, skipping...
+15:28:10 [assembler] INFO: [5/5] Loading panel images...
+15:28:10 [assembler] INFO:       Found 188 images
+15:28:10 [assembler] INFO:       Timeline loaded: 188 panels, script-synced pacing (1.99s-5.03s per panel)
+15:28:10 [assembler] INFO: Assembling video (this takes ~10-15 min)...
+15:28:10 [video_assembler] INFO:   Total duration: 507.1s | 188 images (SCRIPT-SYNCED pacing, 2.05s-5.17s per image)
+15:28:10 [video_assembler] INFO:   Building image clips with Ken Burns effects...
+15:28:11 [video_assembler] INFO:     Prepared 10/188 image clips
+15:28:13 [video_assembler] INFO:     Prepared 20/188 image clips
+15:28:14 [video_assembler] INFO:     Prepared 30/188 image clips
+15:28:15 [video_assembler] INFO:     Prepared 40/188 image clips
+15:28:16 [video_assembler] INFO:     Prepared 50/188 image clips
+15:28:18 [video_assembler] INFO:     Prepared 60/188 image clips
+15:28:19 [video_assembler] INFO:     Prepared 70/188 image clips
+15:28:20 [video_assembler] INFO:     Prepared 80/188 image clips
+15:28:22 [video_assembler] INFO:     Prepared 90/188 image clips
+15:28:23 [video_assembler] INFO:     Prepared 100/188 image clips
+15:28:24 [video_assembler] INFO:     Prepared 110/188 image clips
+15:28:26 [video_assembler] INFO:     Prepared 120/188 image clips
+15:28:27 [video_assembler] INFO:     Prepared 130/188 image clips
+15:28:28 [video_assembler] INFO:     Prepared 140/188 image clips
+15:28:30 [video_assembler] INFO:     Prepared 150/188 image clips
+15:28:31 [video_assembler] INFO:     Prepared 160/188 image clips
+15:28:32 [video_assembler] INFO:     Prepared 170/188 image clips
+15:28:34 [video_assembler] INFO:     Prepared 180/188 image clips
+15:28:35 [video_assembler] INFO:   Concatenating image clips...
+15:28:36 [video_assembler] INFO:   Mixing audio tracks...
+15:28:36 [video_assembler] WARNING:   No music.mp3 found - using voiceover only
+15:28:36 [video_assembler] INFO:   Captions skipped
+15:28:36 [video_assembler] INFO:   Encoding to MP4 (this is the slow part)...
+15:47:55 [assembler] INFO: ============================================================
+15:47:55 [assembler] INFO: ASSEMBLY COMPLETE
+15:47:55 [assembler] INFO: Output: output\final_video.mp4
+15:47:55 [assembler] INFO: Duration: 8:27
+15:47:55 [assembler] INFO: Size: 381.6 MB
+15:47:55 [assembler] INFO: Resolution: 1920x1080 @ 60fps
+15:47:55 [assembler] INFO: Ready for YouTube upload.
+15:47:55 [assembler] INFO: ============================================================
