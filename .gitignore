@@ -10,10 +10,13 @@ __pycache__/
 *.pyc
 *.pyo
 .Python
+.pytest_cache/
+.venv/
 
 # OS
 .DS_Store
 
-# Panel images (large binaries — keep .gitkeep only)
-input/images/*
-!input/images/.gitkeep
+# Large binaries
+input/raw_strips/*
+!input/raw_strips/.gitkeep
+output/panels/*

@@ -1,0 +1,13 @@
+# Regex fallback sanitization (case-insensitive word boundaries)
+kill->unalive
+killed->unalived
+killing->unaliving
+murder->take out
+murdered->took out
+suicide->end it all
+blood->crimson
+death->passing
+died->passed
+dead->gone
+stab->strike
+stabbed->struck

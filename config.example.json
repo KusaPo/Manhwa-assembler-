@@ -1,12 +1,15 @@
 {
-  "_comment": "Copy to config.json and fill in your ElevenLabs credentials: cp config.example.json config.json",
+  "_comment": "Copy to config.json and fill in API keys: cp config.example.json config.json",
+
+  "openai_api_key": "your-key-here",
+  "openai_model": "gpt-4o-mini",
 
   "elevenlabs_api_key": "your-key-here",
   "elevenlabs_voice_id": "your-voice-id-here",
 
   "video_width": 1920,
   "video_height": 1080,
-  "fps": 60,
+  "fps": 30,
 
   "voiceover_volume": 1.0,
   "bg_music_volume": 0.18,
@@ -14,7 +17,6 @@
   "zoom_intensity": 0.15,
   "fade_duration": 0.3,
 
-  "_blur_settings": "Settings for the manhwa-style blurred background fill",
   "blur_background": true,
   "blur_radius": 51,
   "blur_dim": 0.7,
@@ -26,7 +28,9 @@
   "caption_stroke_color": "black",
   "caption_stroke_width": 3,
 
-  "extra_panel_flash_duration": 0.25,
   "inter_sentence_pause_ms": 0,
+  "tts_speed": 1.0,
+  "panels_per_segment_max": 2,
+  "strip_slice_threshold": 240,
   "voice_chunk_cache_dir": "output/voice_chunks"
 }

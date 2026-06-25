@@ -1,9 +1,26 @@
-moviepy==1.0.3
-opencv-python>=4.8.0
-numpy>=1.24.0
+# Core
+python-dotenv>=1.0.0
+
+# LLM (Module 1)
+openai>=1.30.0
+
+# TTS (Module 2)
 requests>=2.31.0
-pydub>=0.25.1
 mutagen>=1.47.0
-imageio>=2.31.0
+
+# Vision (Module 3)
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Video (Module 4)
+moviepy==1.0.3
+ffmpeg-python>=0.2.0
 imageio-ffmpeg>=0.4.9
+imageio>=2.31.0
+
+# Python 3.13+ audio compat
 audioop-lts>=0.2.1; python_version >= "3.13"
+
+# Dev
+pytest>=7.0.0
