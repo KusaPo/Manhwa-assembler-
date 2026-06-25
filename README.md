@@ -40,6 +40,8 @@ Edit `config.json` and fill in:
 
 ### 3. Set up your project folder
 
+**Important:** Every panel filename listed in `input/timeline.json` must exist in `input/images/` before you run the assembler. Panel images are not stored in git — copy them from your asset folder after cloning.
+
 ```
 manhwa_assembler/
 ├── input/
@@ -219,6 +221,14 @@ You can produce ~70 videos per month on a single Creator plan.
 **"No module named audioop" / pyaudioop** — Python 3.13+ removed the `audioop` module. Install the backport: `pip install pyaudioop`
 
 **Panels still feel off** — open `output/sync_sheet_audio.csv` to review the auto mapping. Use `--legacy-sync` to revert to word-count estimates.
+
+**"timeline panels missing from input/images/"** — audio-sync mode requires every panel in `timeline.json` on disk (e.g. `001-panel.png` through `188-panel.png`). The run aborts before TTS if any are missing. Copy all panel images into `input/images/` with matching filenames.
+
+**"Panel durations do not match voiceover"** — the sync plan and voiceover length disagree by more than 2 seconds. Usually means missing panels, stale `output/voiceover.mp3`, or incomplete `output/voice_chunks/`. Regenerate voiceover or fix images, then retry.
+
+**"Voiceover not found" / silent final video** — ensure `output/voiceover.mp3` exists (run without `--skip-voiceover`, or copy `output/` from a machine that already generated it). After encode, the pipeline verifies the MP4 has an audio track; if it fails, install FFmpeg and confirm `voiceover.mp3` plays in a media player.
+
+**"Encoded video has no audio track"** — FFmpeg failed to mux audio. Install system FFmpeg (`brew install ffmpeg` on macOS), confirm `config.json` has `voiceover_volume` > 0, and verify `output/voiceover.mp3` is not empty.
 
 ---
 

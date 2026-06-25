@@ -254,16 +254,22 @@ def resolve_panel_paths(
         durations.append(entry.duration)
 
     if missing:
-        logger.warning(f"  {len(missing)} sync-plan panels missing from disk")
+        preview = ", ".join(missing[:10])
+        suffix = "..." if len(missing) > 10 else ""
+        raise FileNotFoundError(
+            f"{len(missing)} timeline panels missing from {images_dir}/. "
+            f"Expected {len(sync_plan.panels)}, resolved {len(ordered)}. "
+            f"Missing: {preview}{suffix}. "
+            "Copy panel images from your asset folder before running."
+        )
 
     used = {p.name for p in ordered}
     leftover = [p for p in fallback_paths if p.name not in used]
     if leftover:
-        avg = sum(durations) / len(durations) if durations else 2.0
-        for path in leftover:
-            ordered.append(path)
-            durations.append(avg)
-        logger.warning(f"  {len(leftover)} images not in sync plan, appended at end")
+        logger.warning(
+            f"  {len(leftover)} images on disk are not referenced in the sync plan "
+            "(ignored)"
+        )
 
     return ordered, durations
 

@@ -15,7 +15,7 @@ from modules.audio.voice import (
     generate_voiceover_chunks,
     get_audio_duration,
 )
-from modules.common.utils import format_duration, validate_inputs
+from modules.common.utils import format_duration, validate_inputs, validate_timeline_images
 from modules.config import AssemblyConfig, ProjectPaths
 from modules.sync.mapper import (
     build_sync_plan,
@@ -66,19 +66,31 @@ class AssemblyPipeline:
             sys.exit(1)
 
         audio_sync_mode = not args.legacy_sync
+        if not validate_timeline_images(
+            self.paths.images_dir,
+            self.paths.timeline_file,
+            audio_sync_mode,
+        ):
+            logger.error("Timeline image validation failed. Fix issues above and retry.")
+            sys.exit(1)
+
         if audio_sync_mode:
             logger.info("Sync mode: AUDIO-SYNCED (per-sentence TTS durations)")
-            image_paths, image_durations = self._run_audio_sync(args)
+            image_paths, image_durations, sentence_count = self._run_audio_sync(args)
         else:
             logger.info("Sync mode: LEGACY (timeline.json word-count estimates)")
-            image_paths, image_durations = self._run_legacy(args)
+            image_paths, image_durations, sentence_count = self._run_legacy(args)
 
         if args.dry_run:
             return
 
-        self._assemble(args, image_paths, image_durations, audio_sync_mode)
+        self._assemble(
+            args, image_paths, image_durations, audio_sync_mode, sentence_count
+        )
 
-    def _run_audio_sync(self, args: AssemblyArgs) -> tuple[List[Path], Optional[List[float]]]:
+    def _run_audio_sync(
+        self, args: AssemblyArgs
+    ) -> tuple[List[Path], Optional[List[float]], int]:
         if not self.paths.timeline_file.exists():
             logger.error(
                 f"Audio-sync mode requires {self.paths.timeline_file} "
@@ -129,7 +141,7 @@ class AssemblyPipeline:
             )
             logger.info(f"[DRY RUN] Sync plan written to {self.paths.sync_plan_file}")
             logger.info("[DRY RUN] Skipping rendering. Exiting.")
-            return [], None
+            return [], None, len(sentences)
 
         if not (args.skip_voiceover and self.paths.voiceover_file.exists()):
             logger.info("[3/6] Concatenating voice chunks with silence pads...")
@@ -148,16 +160,22 @@ class AssemblyPipeline:
 
         logger.info("[5/6] Loading panel images...")
         image_paths = self._load_images_or_exit()
-        image_paths, image_durations = resolve_panel_paths(
-            sync_plan, self.paths.images_dir, image_paths
-        )
+        try:
+            image_paths, image_durations = resolve_panel_paths(
+                sync_plan, self.paths.images_dir, image_paths
+            )
+        except FileNotFoundError as exc:
+            logger.error(str(exc))
+            sys.exit(1)
         logger.info(
             f"      Sync plan resolved: {len(image_paths)} panels, "
             f"{format_duration(sum(image_durations))} total"
         )
-        return image_paths, image_durations
+        return image_paths, image_durations, len(sentences)
 
-    def _run_legacy(self, args: AssemblyArgs) -> tuple[List[Path], Optional[List[float]]]:
+    def _run_legacy(
+        self, args: AssemblyArgs
+    ) -> tuple[List[Path], Optional[List[float]], int]:
         logger.info("[1/6] Parsing script...")
         script_segments = parse_script(self.paths.script_file)
         logger.info(f"      Found {len(script_segments)} script segments")
@@ -179,7 +197,7 @@ class AssemblyPipeline:
 
         if args.dry_run:
             logger.info("[DRY RUN] Skipping rendering. Exiting.")
-            return [], None
+            return [], None, 0
 
         audio_duration = get_audio_duration(self.paths.voiceover_file)
         logger.info(f"[3/6] Voiceover duration: {format_duration(audio_duration)}")
@@ -191,7 +209,7 @@ class AssemblyPipeline:
             self.paths.timeline_file,
             image_paths,
         )
-        return image_paths, image_durations
+        return image_paths, image_durations, 0
 
     def _load_cached_chunk_durations(self, sentences) -> List[float]:
         durations: List[float] = []
@@ -220,15 +238,38 @@ class AssemblyPipeline:
         image_paths: List[Path],
         image_durations: Optional[List[float]],
         audio_sync_mode: bool,
+        sentence_count: int = 0,
     ) -> None:
+        if not self.paths.voiceover_file.exists():
+            logger.error(
+                f"Voiceover not found: {self.paths.voiceover_file}. "
+                "Run without --skip-voiceover or copy output/voiceover.mp3."
+            )
+            sys.exit(1)
+
+        voiceover_duration = get_audio_duration(self.paths.voiceover_file)
+        if voiceover_duration <= 1.0:
+            logger.error(
+                f"Voiceover is missing or too short ({voiceover_duration:.2f}s): "
+                f"{self.paths.voiceover_file}"
+            )
+            sys.exit(1)
+
+        logger.info(
+            f"Voiceover ready: {format_duration(voiceover_duration)} "
+            f"({self.paths.voiceover_file})"
+        )
+
         logger.info("[6/6] Assembling video (this takes ~10-15 min)...")
+        assemble_config = self.config.as_dict()
+        assemble_config["sentence_count"] = sentence_count
         assemble_video(
             image_paths=image_paths,
             voiceover_path=self.paths.voiceover_file,
             music_path=self.paths.music_file,
             captions_path=None,
             output_path=self.paths.final_video,
-            config=self.config.as_dict(),
+            config=assemble_config,
             preview_mode=args.preview,
             image_durations=image_durations,
             audio_sync_mode=audio_sync_mode,

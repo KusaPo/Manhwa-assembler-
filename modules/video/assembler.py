@@ -14,10 +14,12 @@ The flow:
 """
 
 import logging
+import subprocess
 from pathlib import Path
 from typing import List
 
 import cv2
+import imageio_ffmpeg
 import numpy as np
 from moviepy.audio.AudioClip import CompositeAudioClip
 from moviepy.audio.fx.audio_loop import audio_loop
@@ -36,6 +38,9 @@ from modules.video.images import (
 )
 
 logger = logging.getLogger("video.assembler")
+
+DRIFT_FAIL_THRESHOLD_S = 2.0
+DRIFT_RESCALE_THRESHOLD_S = 0.05
 
 
 def assemble_video(
@@ -84,6 +89,11 @@ def assemble_video(
 
     # Load voiceover to determine total video duration
     voiceover = AudioFileClip(str(voiceover_path))
+    if voiceover.duration <= 0:
+        voiceover.close()
+        raise ValueError(
+            f"Voiceover has no audio content: {voiceover_path}"
+        )
     total_duration = voiceover.duration
 
     if preview_mode:
@@ -97,20 +107,37 @@ def assemble_video(
     # behaviour of spreading every image evenly across the audio.
     if image_durations is not None and len(image_durations) == len(image_paths):
         durations = [float(d) for d in image_durations]
-        if audio_sync_mode:
-            logger.info(
-                f"  Total duration: {total_duration:.1f}s | {len(image_paths)} images "
-                f"(AUDIO-SYNCED pacing, {min(durations):.2f}s-{max(durations):.2f}s per image)"
+        mode_label = "AUDIO-SYNCED" if audio_sync_mode else "SCRIPT-SYNCED"
+
+        inter_sentence_pause_ms = config.get("inter_sentence_pause_ms", 0)
+        sentence_count = config.get("sentence_count", 0)
+        pause_total_s = (
+            inter_sentence_pause_ms * max(0, sentence_count - 1) / 1000.0
+        )
+        expected_panel_sum = total_duration - pause_total_s
+        panel_sum = sum(durations)
+        drift = abs(panel_sum - expected_panel_sum)
+
+        if drift > DRIFT_FAIL_THRESHOLD_S:
+            voiceover.close()
+            raise ValueError(
+                f"Panel durations ({panel_sum:.1f}s) do not match voiceover "
+                f"({total_duration:.1f}s, expected panels {expected_panel_sum:.1f}s). "
+                "Check input/images/ and output/sync_plan.json."
             )
-        else:
-            # Rescale so the durations sum to exactly the (possibly preview-trimmed)
-            # audio length - keeps video locked to audio with no drift.
-            scale = total_duration / sum(durations)
+
+        if drift > DRIFT_RESCALE_THRESHOLD_S:
+            scale = expected_panel_sum / panel_sum
             durations = [d * scale for d in durations]
             logger.info(
-                f"  Total duration: {total_duration:.1f}s | {len(image_paths)} images "
-                f"(SCRIPT-SYNCED pacing, {min(durations):.2f}s-{max(durations):.2f}s per image)"
+                f"  Rescaled panel durations by {scale:.4f} "
+                f"(drift {drift:.2f}s vs voiceover)"
             )
+
+        logger.info(
+            f"  Total duration: {total_duration:.1f}s | {len(image_paths)} images "
+            f"({mode_label} pacing, {min(durations):.2f}s-{max(durations):.2f}s per image)"
+        )
     else:
         per_image_duration = total_duration / len(image_paths)
         durations = [per_image_duration] * len(image_paths)
@@ -155,10 +182,6 @@ def assemble_video(
     logger.info("  Concatenating image clips...")
     video = concatenate_videoclips(image_clips, method="compose")
 
-    # In case the concatenated video drifts slightly off the audio,
-    # trim or extend to exactly match
-    video = video.set_duration(total_duration)
-
     # Build audio track: voiceover + looped background music
     logger.info("  Mixing audio tracks...")
     audio_tracks = [voiceover.fx(volumex, voiceover_volume)]
@@ -174,7 +197,7 @@ def assemble_video(
     else:
         logger.warning("  No music.mp3 found - using voiceover only")
 
-    final_audio = CompositeAudioClip(audio_tracks)
+    final_audio = CompositeAudioClip(audio_tracks).set_duration(total_duration)
     video = video.set_audio(final_audio)
 
     # Overlay captions (skip if disabled)
@@ -210,11 +233,29 @@ def assemble_video(
         logger="bar",  # MoviePy progress bar
     )
 
+    if not _verify_audio_stream(output_path):
+        logger.error(
+            "Encoded video has no audio track — check FFmpeg installation "
+            f"and voiceover file: {voiceover_path}"
+        )
+        raise RuntimeError(f"Output video has no audio track: {output_path}")
+
     # Clean up resources
     video.close()
     voiceover.close()
 
     return output_path
+
+
+def _verify_audio_stream(video_path: Path) -> bool:
+    """Return True if the MP4 contains an audio stream."""
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    result = subprocess.run(
+        [ffmpeg, "-i", str(video_path)],
+        capture_output=True,
+        text=True,
+    )
+    return "Audio:" in result.stderr
 
 
 def _build_image_clip(
