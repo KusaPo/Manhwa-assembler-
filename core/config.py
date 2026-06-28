@@ -35,7 +35,15 @@ class RecapConfig:
     tts_speed: float = 1.0
     panels_per_segment_max: int = 2
     strip_slice_threshold: int = 240
+    strip_max_gutter_height: int = 40
     voice_chunk_cache_dir: str = "output/voice_chunks"
+    content_crop: bool = True
+    bubble_removal: bool = False
+    bubble_removal_langs: str = "ko,en"
+    bubble_removal_gpu: bool = False
+    bubble_removal_confidence: float = 0.3
+    bubble_removal_dilation_px: int = 20
+    panel_min_content_ratio: float = 0.05
     extra_fields: Dict[str, Any] = field(default_factory=dict, repr=False)
 
     @classmethod

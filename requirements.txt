@@ -12,6 +12,7 @@ mutagen>=1.47.0
 opencv-python>=4.8.0
 Pillow>=10.0.0
 numpy>=1.24.0
+easyocr>=1.7.0
 
 # Video (Module 4)
 moviepy==1.0.3

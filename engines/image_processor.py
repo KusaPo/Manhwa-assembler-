@@ -101,26 +101,53 @@ def detect_panel_boundaries(
     image: np.ndarray,
     threshold: int = 240,
     min_panel_height: int = 80,
+    max_gutter_height: int = 40,
 ) -> List[Tuple[int, int]]:
-    """Detect horizontal panel splits via row brightness projection."""
+    """
+    Pass 2 panel slicer.
+
+    Two separator signals are OR-ed:
+    - Bright rows : row mean > threshold  (white gutter)
+    - Dark rows   : ≥85 % of pixels below value 25  (black border line)
+
+    Wide clusters (> max_gutter_height) are only treated as gutters if
+    ≥70 % of their pixels are white — catching blank transition areas and
+    mixed bubble+white-band separators, while blocking speech bubbles that
+    sit entirely on dark coloured art backgrounds.
+    """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+
     row_means = gray.mean(axis=1)
-    h = image.shape[0]
+    dark_frac = (gray < 25).sum(axis=1) / w
+    is_separator = (row_means > threshold) | (dark_frac > 0.85)
 
-    is_gutter = row_means > threshold
     boundaries = [0]
-    in_gutter = False
-    gutter_start = 0
+    in_sep = False
+    sep_start = 0
 
-    for y, gutter in enumerate(is_gutter):
-        if gutter and not in_gutter:
-            in_gutter = True
-            gutter_start = y
-        elif not gutter and in_gutter:
-            in_gutter = False
-            gutter_mid = (gutter_start + y) // 2
-            if gutter_mid - boundaries[-1] >= min_panel_height:
-                boundaries.append(gutter_mid)
+    for y in range(h):
+        if is_separator[y] and not in_sep:
+            in_sep = True
+            sep_start = y
+        elif not is_separator[y] and in_sep:
+            in_sep = False
+            sep_height = y - sep_start
+            sep_mid = (sep_start + y) // 2
+
+            if sep_height <= max_gutter_height:
+                # Thin separator — always a gutter
+                is_gutter = True
+            else:
+                # Wide separator: only a gutter if rows are near-pure-white.
+                # Blank space / narration boxes are ≥90 % white across full width.
+                # Speech bubbles on coloured art backgrounds have much lower
+                # white coverage even when they pass the row-mean threshold.
+                white_frac = float((gray[sep_start:y] > threshold).mean())
+                is_gutter = white_frac > 0.70
+
+            if is_gutter and sep_mid - boundaries[-1] >= min_panel_height:
+                boundaries.append(sep_mid)
     boundaries.append(h)
 
     panels: List[Tuple[int, int]] = []
@@ -129,9 +156,7 @@ def detect_panel_boundaries(
         if y2 - y1 >= min_panel_height:
             panels.append((y1, y2))
 
-    if len(panels) <= 1:
-        return [(0, h)]
-    return panels
+    return panels if len(panels) > 1 else [(0, h)]
 
 
 def get_ken_burns_frame_function(
@@ -203,6 +228,97 @@ def _zoom_image(
     return cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LANCZOS4)
 
 
+def is_junk_panel(
+    crop: np.ndarray,
+    min_content_ratio: float = 0.05,
+    white_threshold: int = 240,
+) -> bool:
+    """
+    Return True if the crop should be discarded. Three checks:
+
+    1. Too short  (<80 px) — thin slivers and bubble-bottom cuts.
+    2. Too wide relative to height (>3×) — horizontal text-only title cards
+       like "ASSASSIN," or "THE LEGENDARY"; webtoon panels are always
+       taller than wide so a landscape ratio means a bad cut.
+    3. Mostly blank — standalone speech-bubble panels with little art.
+    """
+    h, w = crop.shape[:2]
+    if h < 80:
+        return True
+    if w / h > 3.0:
+        return True
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    non_white = int((gray < white_threshold).sum())
+    return (non_white / gray.size) < min_content_ratio
+
+
+def crop_to_content(
+    image: np.ndarray,
+    white_threshold: int = 240,
+    min_content_frac: float = 0.10,
+    min_bubble_width_frac: float = 0.15,
+    min_bubble_height: int = 15,
+    margin_px: int = 4,
+) -> np.ndarray:
+    """
+    Two-step crop to remove cross-panel speech bubbles and white margins.
+
+    Step 1 — edge-bubble removal:
+        Find large white blobs that touch the top or bottom edge of the
+        crop. These are always speech bubbles that bled across the panel
+        boundary cut. They are removed entirely.
+
+    Step 2 — row tightening:
+        Within the remaining image, drop rows where fewer than
+        min_content_frac of pixels are non-white. This catches title
+        boxes, partial borders, and blank margins left after Step 1.
+
+    Returns the original image unchanged if the result would be < 30 px tall.
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+
+    # --- Step 1: remove edge-touching white blobs (speech bubbles) ---
+    _, binary = cv2.threshold(gray, white_threshold, 255, cv2.THRESH_BINARY)
+    num_labels, _, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=4)
+
+    top_cut = 0
+    bottom_cut = h
+    min_blob_w = int(w * min_bubble_width_frac)
+    edge_tol = 15  # pixels — handles panels with black border before the bubble starts
+
+    for i in range(1, num_labels):
+        blob_w = stats[i, cv2.CC_STAT_WIDTH]
+        blob_h = stats[i, cv2.CC_STAT_HEIGHT]
+        if blob_w < min_blob_w or blob_h < min_bubble_height:
+            continue
+        y_top = stats[i, cv2.CC_STAT_TOP]
+        y_bot = y_top + blob_h
+        if y_top <= edge_tol:
+            top_cut = max(top_cut, y_bot)
+        if y_bot >= h - edge_tol:
+            bottom_cut = min(bottom_cut, y_top)
+
+    if top_cut >= bottom_cut or (bottom_cut - top_cut) < 30:
+        return image
+
+    # --- Step 2: tighten to content rows within the surviving region ---
+    sub_gray = gray[top_cut:bottom_cut, :]
+    row_has_content = (sub_gray < white_threshold).mean(axis=1) >= min_content_frac
+    content_rows = np.where(row_has_content)[0]
+
+    if len(content_rows) == 0:
+        return image
+
+    r1 = top_cut + max(0, int(content_rows[0]) - margin_px)
+    r2 = top_cut + min(bottom_cut - top_cut, int(content_rows[-1]) + 1 + margin_px)
+
+    if (r2 - r1) < 30:
+        return image
+
+    return image[r1:r2, :]
+
+
 class ImageProcessor:
     def __init__(self, config: RecapConfig, paths: ProjectPaths) -> None:
         self.config = config
@@ -233,14 +349,28 @@ class ImageProcessor:
                 logger.warning(f"  Could not read {strip_path.name}, skipping")
                 continue
 
+            # Pass 1: slice into panels
             bounds = detect_panel_boundaries(
                 image,
                 threshold=self.config.strip_slice_threshold,
+                max_gutter_height=self.config.strip_max_gutter_height,
             )
-            logger.info(f"  {strip_path.name}: {len(bounds)} panel(s)")
+            logger.info(f"  [Pass 1] {strip_path.name}: {len(bounds)} panel(s)")
 
+            skipped = 0
             for y1, y2 in bounds:
                 crop = image[y1:y2, :]
+
+                # Pass 2: tight-crop to art content (trims white bubble margins)
+                if self.config.content_crop:
+                    crop = crop_to_content(crop)
+
+                # Discard standalone bubble panels or near-blank slivers
+                if is_junk_panel(crop, min_content_ratio=self.config.panel_min_content_ratio):
+                    skipped += 1
+                    logger.debug(f"    Skipping blank/junk panel slice (y={y1}-{y2})")
+                    continue
+
                 fitted = fit_image_to_canvas(
                     crop,
                     target_width=self.config.video_width,
@@ -257,6 +387,8 @@ class ImageProcessor:
                     PanelAsset(index=order, path=out_path, source_strip=strip_path.name)
                 )
                 order += 1
+            if skipped:
+                logger.info(f"    Discarded {skipped} junk panel(s) from {strip_path.name}")
 
         logger.info(f"  Exported {len(panels)} panels to {self.paths.panels_dir}")
         return panels
