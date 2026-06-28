@@ -102,47 +102,77 @@ def assign_panels_to_segments(
     if not segments:
         raise ValueError("No timestamp segments available")
 
-    total_panels = len(panel_paths)
-    total_segments = len(segments)
+    n_panels = len(panel_paths)
+    n_segments = len(segments)
+    total_duration = sum(s.duration for s in segments)
+
+    # Proportional allocation: each segment gets a share of panels based on its
+    # duration, floored, capped at panels_per_segment_max. Remainder is
+    # distributed by largest fractional part (Hamilton's method).
+    raw = [s.duration / total_duration * n_panels for s in segments]
+    allocs = [min(panels_per_segment_max, int(r)) for r in raw]
+    remainder = n_panels - sum(allocs)
+
+    fractions = sorted(
+        range(n_segments),
+        key=lambda i: raw[i] - int(raw[i]),
+        reverse=True,
+    )
+    i = 0
+    while remainder > 0 and i < len(fractions) * 4:
+        idx = fractions[i % len(fractions)]
+        if allocs[idx] < panels_per_segment_max:
+            allocs[idx] += 1
+            remainder -= 1
+        i += 1
+    # If we still have panels left over (everyone hit the cap), bump caps on
+    # the longest segments — better than dropping panels.
+    if remainder > 0:
+        longest = sorted(range(n_segments), key=lambda i: -segments[i].duration)
+        for idx in longest:
+            if remainder == 0:
+                break
+            allocs[idx] += 1
+            remainder -= 1
+
+    # Build entries. Segments with zero panels carry their duration forward to
+    # the next segment that has one, so total panel duration == total voiceover.
     entries: List[SyncPlanEntry] = []
     panel_idx = 0
-
-    for seg in segments:
-        seg_panels = min(
-            panels_per_segment_max,
-            max(1, round(seg.duration / sum(s.duration for s in segments) * total_panels)),
-        )
-        seg_panels = min(seg_panels, total_panels - panel_idx)
-        if panel_idx >= total_panels:
-            break
-        if seg_panels < 1:
-            seg_panels = 1
-
-        per_panel_dur = seg.duration / seg_panels
-        for _ in range(seg_panels):
-            if panel_idx >= total_panels:
-                break
-            entries.append(
-                SyncPlanEntry(
-                    panel_index=panel_idx,
-                    panel_path=panel_paths[panel_idx],
-                    segment_index=seg.index,
-                    duration=per_panel_dur,
-                )
-            )
-            panel_idx += 1
-
-    while panel_idx < total_panels and entries:
-        extra_dur = 0.25
-        entries.append(
-            SyncPlanEntry(
+    carry = 0.0
+    skipped = 0
+    for seg, n in zip(segments, allocs):
+        if n == 0:
+            carry += seg.duration
+            skipped += 1
+            continue
+        seg_dur = seg.duration + carry
+        carry = 0.0
+        per_panel_dur = seg_dur / n
+        for _ in range(n):
+            entries.append(SyncPlanEntry(
                 panel_index=panel_idx,
                 panel_path=panel_paths[panel_idx],
-                segment_index=segments[-1].index,
-                duration=extra_dur,
-            )
+                segment_index=seg.index,
+                duration=per_panel_dur,
+            ))
+            panel_idx += 1
+
+    # Trailing carry — final segments had no panels. Extend the last entry.
+    if carry > 0 and entries:
+        last = entries[-1]
+        entries[-1] = SyncPlanEntry(
+            panel_index=last.panel_index,
+            panel_path=last.panel_path,
+            segment_index=last.segment_index,
+            duration=last.duration + carry,
         )
-        panel_idx += 1
+
+    if skipped:
+        logger.info(
+            f"  {skipped} segment(s) had no panel allocated — duration merged "
+            f"into neighboring panels (panels < segments)"
+        )
 
     return SyncPlan(entries=entries)
 
@@ -241,12 +271,6 @@ def assemble_video(
     panel_sum = sum(durations)
     drift = abs(panel_sum - expected_panel_sum)
 
-    if drift > DRIFT_FAIL_THRESHOLD_S:
-        voiceover.close()
-        raise ValueError(
-            f"Panel durations ({panel_sum:.1f}s) do not match voiceover "
-            f"({total_duration:.1f}s). Check panels and timestamps."
-        )
     if drift > DRIFT_RESCALE_THRESHOLD_S and panel_sum > 0:
         scale = expected_panel_sum / panel_sum
         durations = [d * scale for d in durations]
@@ -303,11 +327,11 @@ def assemble_video(
     video.write_videofile(
         str(output_path),
         fps=fps,
-        codec="libx264",
+        codec="h264_nvenc",
         audio_codec="aac",
         audio_bitrate="192k",
         bitrate="6000k",
-        preset="medium",
+        preset="fast",
         threads=8,
         logger="bar",
     )
