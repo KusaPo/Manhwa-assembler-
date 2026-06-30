@@ -83,6 +83,7 @@ class ProjectPaths:
     raw_strips_dir: Path
     script_txt: Path
     script_json: Path
+    panel_script_file: Path
     music_file: Path
     voiceover_file: Path
     timestamps_file: Path
@@ -111,6 +112,7 @@ class ProjectPaths:
             raw_strips_dir=input_dir / "raw_strips",
             script_txt=input_dir / "script.txt",
             script_json=output_dir / "script.json",
+            panel_script_file=input_dir / "panel_script.json",
             music_file=input_dir / "music.mp3",
             voiceover_file=output_dir / "voiceover.mp3",
             timestamps_file=output_dir / "timestamps.json",
