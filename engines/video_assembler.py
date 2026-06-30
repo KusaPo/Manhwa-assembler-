@@ -35,15 +35,32 @@ MIN_HOLD_S       = 1.8
 
 NVENC_MAX_WORKERS = 3  # consumer GPU NVENC session limit
 
-# Random pool used when no motion_map entry exists
-EFFECT_TYPES = ["zoom_in", "zoom_out", "pan_left", "pan_right", "static"]
-EFFECT_WEIGHTS = [35, 30, 15, 15, 5]
+# Random pool — zoom only, no panning (panning snaps at 1920px without upscaling)
+EFFECT_TYPES = ["zoom_in", "zoom_out", "static"]
+EFFECT_WEIGHTS = [50, 45, 5]
 
 # Full set of named motions (random pool + content-classifier names)
 ALL_MOTIONS = set(EFFECT_TYPES) | {
     "zoom_in_slow", "zoom_in_center", "zoom_out_slow",
     "pan_down", "pan_up", "drift_diagonal",
+    "pan_left", "pan_right",
 }
+
+# Map content-classifier pan/drift motions → zoom equivalents (smooth without upscaling)
+_PAN_TO_ZOOM = {
+    "pan_down":       "zoom_in",
+    "pan_up":         "zoom_out",
+    "drift_diagonal": "zoom_in",
+    "zoom_in_slow":   "zoom_in",
+    "zoom_out_slow":  "zoom_out",
+    "zoom_in_center": "zoom_in",
+    "pan_left":       "zoom_in",
+    "pan_right":      "zoom_out",
+    "static":         "static",
+}
+
+# Rotation used for subclips 2+ (different effect from subclip 1 so it doesn't look like a replay)
+_SUBCLIP_ROTATION = ["zoom_out", "zoom_in", "static", "zoom_in", "zoom_out"]
 
 
 # ---------------------------------------------------------------------------
@@ -329,9 +346,10 @@ def _render_panel_clip(args: tuple) -> Path:
     zp = _zoompan_filter(effect, n_frames, fps, width, height, zoom_intensity)
 
     vf_parts = [zp]
-    if fade_duration > 0 and duration > fade_duration * 2:
-        vf_parts.append(f"fade=t=in:st=0:d={fade_duration:.3f}")
-        vf_parts.append(f"fade=t=out:st={duration - fade_duration:.3f}:d={fade_duration:.3f}")
+    if fade_duration > 0 and n_frames > round(fps * fade_duration * 2):
+        fade_n = round(fps * fade_duration)
+        vf_parts.append(f"fade=t=in:st=0:d={fade_n / fps:.4f}")
+        vf_parts.append(f"fade=t=out:st={(n_frames - fade_n) / fps:.4f}:d={fade_n / fps:.4f}")
     vf = ",".join(vf_parts)
 
     if use_nvenc:
@@ -344,7 +362,7 @@ def _render_panel_clip(args: tuple) -> Path:
         "-loop", "1", "-framerate", str(fps),
         "-i", str(image_path),
         "-vf", vf,
-        "-t", f"{duration:.4f}",
+        "-frames:v", str(n_frames),  # exact frame count — no rounding drift
         *codec_args,
         "-an", "-pix_fmt", "yuv420p",
         str(out_path),
@@ -472,15 +490,31 @@ def assemble_video(
         except Exception:
             pass
 
-    def _pick_effect(img_path: Path) -> str:
+    def _pick_effect(img_path: Path, subclip_idx: int = 0) -> str:
+        # Subclips 2+ rotate through a fixed sequence so repeated panels look different
+        if subclip_idx > 0:
+            return _SUBCLIP_ROTATION[(subclip_idx - 1) % len(_SUBCLIP_ROTATION)]
+        # First (or only) clip: prefer content-aware motion, remapped to smooth zoom
         try:
             panel_num = int(img_path.stem.split("-")[0])
             entry = motion_map.get(str(panel_num))
             if entry and entry.get("motion") in ALL_MOTIONS:
-                return entry["motion"]
+                return _PAN_TO_ZOOM.get(entry["motion"], "zoom_in")
         except (ValueError, IndexError):
             pass
         return random.choices(EFFECT_TYPES, weights=EFFECT_WEIGHTS, k=1)[0]
+
+    # Detect consecutive same-panel runs (subclip splits) to assign distinct effects
+    prev_path = None
+    subclip_counters: list[int] = []
+    sc_idx = 0
+    for img, _ in pairs:
+        if img == prev_path:
+            sc_idx += 1
+        else:
+            sc_idx = 0
+        subclip_counters.append(sc_idx)
+        prev_path = img
 
     # Parallel clip rendering
     temp_dir = output_path.parent / "_temp_clips"
@@ -488,7 +522,8 @@ def assemble_video(
 
     render_args = [
         (ffmpeg_exe, img, dur, temp_dir / f"clip_{i:04d}.mp4",
-         fps, width, height, zoom_intensity, fade_duration, use_nvenc, _pick_effect(img))
+         fps, width, height, zoom_intensity, fade_duration, use_nvenc,
+         _pick_effect(img, subclip_counters[i]))
         for i, (img, dur) in enumerate(pairs)
     ]
     clip_paths = [temp_dir / f"clip_{i:04d}.mp4" for i in range(len(pairs))]
