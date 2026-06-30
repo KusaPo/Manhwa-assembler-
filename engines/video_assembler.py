@@ -35,8 +35,15 @@ MIN_HOLD_S       = 1.8
 
 NVENC_MAX_WORKERS = 3  # consumer GPU NVENC session limit
 
+# Random pool used when no motion_map entry exists
 EFFECT_TYPES = ["zoom_in", "zoom_out", "pan_left", "pan_right", "static"]
 EFFECT_WEIGHTS = [35, 30, 15, 15, 5]
+
+# Full set of named motions (random pool + content-classifier names)
+ALL_MOTIONS = set(EFFECT_TYPES) | {
+    "zoom_in_slow", "zoom_in_center", "zoom_out_slow",
+    "pan_down", "pan_up", "drift_diagonal",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -273,11 +280,15 @@ def _zoompan_filter(
     zi = zoom_intensity
     step = zi / max(n_frames, 1)
 
-    if effect == "zoom_in":
+    if effect in ("zoom_in", "zoom_in_slow"):
         z = f"min(zoom+{step:.7f},{1 + zi:.5f})"
         x = "trunc(iw/2-(iw/zoom/2))"
         y = "trunc(ih/2-(ih/zoom/2))"
-    elif effect == "zoom_out":
+    elif effect == "zoom_in_center":
+        z = f"min(zoom+{step:.7f},{1 + zi:.5f})"
+        x = "trunc(iw/2-(iw/zoom/2))"
+        y = "trunc(ih/2-(ih/zoom/2)+(ih*0.05))"  # slightly lower — center on face
+    elif effect in ("zoom_out", "zoom_out_slow"):
         z = f"if(eq(on,1),{1 + zi:.5f},max(zoom-{step:.7f},1))"
         x = "trunc(iw/2-(iw/zoom/2))"
         y = "trunc(ih/2-(ih/zoom/2))"
@@ -289,6 +300,18 @@ def _zoompan_filter(
         z = f"{1 + zi * 0.5:.5f}"
         x = f"trunc((iw-iw/zoom)*(1-on/{n_frames}))"
         y = "trunc(ih/2-(ih/zoom/2))"
+    elif effect == "pan_down":
+        z = f"{1 + zi * 0.5:.5f}"
+        x = "trunc(iw/2-(iw/zoom/2))"
+        y = f"trunc((ih-ih/zoom)*on/{n_frames})"
+    elif effect == "pan_up":
+        z = f"{1 + zi * 0.5:.5f}"
+        x = "trunc(iw/2-(iw/zoom/2))"
+        y = f"trunc((ih-ih/zoom)*(1-on/{n_frames}))"
+    elif effect == "drift_diagonal":
+        z = f"min(zoom+{step * 0.6:.7f},{1 + zi * 0.8:.5f})"
+        x = f"trunc(iw/2-(iw/zoom/2)+(iw*0.04)*on/{n_frames})"
+        y = f"trunc(ih/2-(ih/zoom/2)+(ih*0.04)*on/{n_frames})"
     else:  # static
         z = "1"
         x = "0"
@@ -300,10 +323,9 @@ def _zoompan_filter(
 def _render_panel_clip(args: tuple) -> Path:
     """Render one image to a temp video clip via ffmpeg zoompan (runs in thread pool)."""
     (ffmpeg_exe, image_path, duration, out_path,
-     fps, width, height, zoom_intensity, fade_duration, use_nvenc) = args
+     fps, width, height, zoom_intensity, fade_duration, use_nvenc, effect) = args
 
     n_frames = max(1, round(fps * duration))
-    effect = random.choices(EFFECT_TYPES, weights=EFFECT_WEIGHTS, k=1)[0]
     zp = _zoompan_filter(effect, n_frames, fps, width, height, zoom_intensity)
 
     vf_parts = [zp]
@@ -440,13 +462,33 @@ def assemble_video(
     use_nvenc = _check_nvenc(ffmpeg_exe)
     logger.info(f"  Encoder: {'h264_nvenc (GPU)' if use_nvenc else 'libx264 (CPU)'}")
 
+    # Load motion map if content_classifier has run
+    motion_map_path = output_path.parent / "motion_map.json"
+    motion_map = {}
+    if motion_map_path.exists():
+        try:
+            motion_map = json.loads(motion_map_path.read_text(encoding="utf-8"))
+            logger.info(f"  Content-aware motion map loaded ({len(motion_map)} panels)")
+        except Exception:
+            pass
+
+    def _pick_effect(img_path: Path) -> str:
+        try:
+            panel_num = int(img_path.stem.split("-")[0])
+            entry = motion_map.get(str(panel_num))
+            if entry and entry.get("motion") in ALL_MOTIONS:
+                return entry["motion"]
+        except (ValueError, IndexError):
+            pass
+        return random.choices(EFFECT_TYPES, weights=EFFECT_WEIGHTS, k=1)[0]
+
     # Parallel clip rendering
     temp_dir = output_path.parent / "_temp_clips"
     temp_dir.mkdir(exist_ok=True)
 
     render_args = [
         (ffmpeg_exe, img, dur, temp_dir / f"clip_{i:04d}.mp4",
-         fps, width, height, zoom_intensity, fade_duration, use_nvenc)
+         fps, width, height, zoom_intensity, fade_duration, use_nvenc, _pick_effect(img))
         for i, (img, dur) in enumerate(pairs)
     ]
     clip_paths = [temp_dir / f"clip_{i:04d}.mp4" for i in range(len(pairs))]

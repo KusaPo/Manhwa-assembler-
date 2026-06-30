@@ -21,12 +21,13 @@ Fixes two bugs in the zoompan-based renderer:
 from __future__ import annotations
 
 import csv
+import json
 import logging
 import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import imageio_ffmpeg
 
@@ -145,7 +146,26 @@ def plan_clips_from_csv(
 # Motion selection
 # ---------------------------------------------------------------------------
 
-def pick_motion(plan: ClipPlan, hold_index: int) -> str:
+def pick_motion(
+    plan: ClipPlan,
+    hold_index: int,
+    motion_map: Optional[Dict] = None,
+) -> str:
+    """
+    Priority: 1) motion_map override (content-aware), 2) flash=static,
+    3) short hold=zoom, 4) round-robin rotation.
+    """
+    if motion_map:
+        try:
+            panel_num = int(plan.panel_path.stem.split("-")[0])
+            entry = motion_map.get(str(panel_num))
+            if entry and entry.get("motion") in MOTIONS:
+                if plan.role == "flash":
+                    return "static"
+                return entry["motion"]
+        except (ValueError, IndexError, AttributeError):
+            pass
+
     if plan.role == "flash":
         return "static"
     if plan.duration_s < 2.0:
@@ -296,6 +316,7 @@ def render_video(
     output_path: Path,
     music_path: Optional[Path] = None,
     captions_path: Optional[Path] = None,
+    motion_map_path: Optional[Path] = None,
     work_dir: Optional[Path] = None,
     fps: int = FPS_DEFAULT,
     upscale: int = UPSCALE_FACTOR,
@@ -310,6 +331,13 @@ def render_video(
     clips_dir = work_dir / "clips"
     clips_dir.mkdir(parents=True, exist_ok=True)
 
+    motion_map: Optional[Dict] = None
+    if motion_map_path and motion_map_path.exists():
+        motion_map = json.loads(motion_map_path.read_text(encoding="utf-8"))
+        logger.info(f"  Loaded motion map ({len(motion_map)} entries)")
+    elif motion_map_path:
+        logger.warning(f"  motion_map not found at {motion_map_path}, using rotation")
+
     plans = plan_clips_from_csv(csv_path, panels_dir, fps=fps)
     if not plans:
         raise RuntimeError("No clips to render — empty CSV or all panels missing")
@@ -318,7 +346,7 @@ def render_video(
     clip_paths: List[Path] = []
     hold_idx = 0
     for plan in plans:
-        motion = pick_motion(plan, hold_idx)
+        motion = pick_motion(plan, hold_idx, motion_map)
         if plan.role == "hold":
             hold_idx += 1
         clip_out = clips_dir / f"clip_{plan.order:04d}.mp4"
@@ -362,6 +390,8 @@ if __name__ == "__main__":
     p.add_argument("--fps",        type=int,  default=FPS_DEFAULT)
     p.add_argument("--upscale",    type=int,  default=UPSCALE_FACTOR,
                    help="4=fast preview, 8=production, 16=max smooth")
+    p.add_argument("--motion-map",        type=Path, default=None,
+                   help="Optional motion_map.json from content_classifier")
     p.add_argument("--keep-intermediate", action="store_true")
     args = p.parse_args()
 
@@ -372,6 +402,7 @@ if __name__ == "__main__":
         output_path=args.output,
         music_path=args.music,
         captions_path=args.captions,
+        motion_map_path=args.motion_map,
         fps=args.fps,
         upscale=args.upscale,
         keep_intermediate=args.keep_intermediate,

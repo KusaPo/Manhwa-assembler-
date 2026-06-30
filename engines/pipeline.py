@@ -109,6 +109,7 @@ class RecapPipeline:
                 upscale = int(self.config.extra_fields.get("upscale_factor", 4))
                 logger.info(f"  Using ffmpeg renderer (upscale={upscale}x, frame-exact)")
                 captions = self.paths.subtitles_file if args.burn_captions and self.paths.subtitles_file.exists() else None
+                motion_map = self.paths.output_dir / "motion_map.json"
                 ffmpeg_render(
                     csv_path=self.paths.sync_sheet_csv,
                     panels_dir=self.paths.panels_dir,
@@ -116,6 +117,7 @@ class RecapPipeline:
                     output_path=self.paths.final_video,
                     music_path=self.paths.music_file,
                     captions_path=captions,
+                    motion_map_path=motion_map if motion_map.exists() else None,
                 )
             else:
                 if renderer == "ffmpeg":
