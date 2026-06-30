@@ -87,6 +87,7 @@ class ProjectPaths:
     music_file: Path
     voiceover_file: Path
     timestamps_file: Path
+    sync_sheet_csv: Path
     panels_dir: Path
     subtitles_file: Path
     sync_plan_file: Path
@@ -116,6 +117,7 @@ class ProjectPaths:
             music_file=input_dir / "music.mp3",
             voiceover_file=output_dir / "voiceover.mp3",
             timestamps_file=output_dir / "timestamps.json",
+            sync_sheet_csv=output_dir / "sync_sheet_audio.csv",
             panels_dir=output_dir / "panels",
             subtitles_file=output_dir / "subtitles.srt",
             sync_plan_file=output_dir / "sync_plan.json",

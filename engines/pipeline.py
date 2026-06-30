@@ -96,22 +96,39 @@ class RecapPipeline:
             if not self.paths.voiceover_file.exists():
                 logger.error(f"Missing voiceover: {self.paths.voiceover_file}")
                 sys.exit(1)
-            if not self.paths.timestamps_file.exists():
-                logger.error(f"Missing timestamps: {self.paths.timestamps_file}")
-                sys.exit(1)
             if not validate_panels_dir(self.paths.panels_dir):
                 sys.exit(1)
 
             vo_dur = get_audio_duration(self.paths.voiceover_file)
             logger.info(f"  Voiceover ready: {format_duration(vo_dur)}")
 
-            panel_paths = ImageProcessor(self.config, self.paths).load_panel_paths()
             logger.info("[Phase 4] Video assembly...")
-            VideoAssembler(self.config, self.paths).assemble(
-                panel_paths,
-                preview_mode=args.preview,
-                burn_captions=args.burn_captions,
-            )
+            renderer = self.config.extra_fields.get("renderer") or self.config.as_dict().get("renderer")
+            if renderer == "ffmpeg" and self.paths.sync_sheet_csv.exists():
+                from engines.ffmpeg_renderer import render_video as ffmpeg_render
+                upscale = int(self.config.extra_fields.get("upscale_factor", 4))
+                logger.info(f"  Using ffmpeg renderer (upscale={upscale}x, frame-exact)")
+                captions = self.paths.subtitles_file if args.burn_captions and self.paths.subtitles_file.exists() else None
+                ffmpeg_render(
+                    csv_path=self.paths.sync_sheet_csv,
+                    panels_dir=self.paths.panels_dir,
+                    voiceover_path=self.paths.voiceover_file,
+                    output_path=self.paths.final_video,
+                    music_path=self.paths.music_file,
+                    captions_path=captions,
+                )
+            else:
+                if renderer == "ffmpeg":
+                    logger.warning(f"  sync_sheet_audio.csv not found — falling back to timestamp assembler")
+                if not self.paths.timestamps_file.exists():
+                    logger.error(f"Missing timestamps: {self.paths.timestamps_file}")
+                    sys.exit(1)
+                panel_paths = ImageProcessor(self.config, self.paths).load_panel_paths()
+                VideoAssembler(self.config, self.paths).assemble(
+                    panel_paths,
+                    preview_mode=args.preview,
+                    burn_captions=args.burn_captions,
+                )
 
             size_mb = os.path.getsize(self.paths.final_video) / (1024 * 1024)
             logger.info("=" * 60)
