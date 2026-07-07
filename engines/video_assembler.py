@@ -16,8 +16,9 @@ import random
 import re
 import shutil
 import subprocess
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import imageio_ffmpeg
 import mutagen.mp3
@@ -286,6 +287,23 @@ def _check_nvenc(ffmpeg_exe: str) -> bool:
         return False
 
 
+@dataclass
+class _ClipJob:
+    ffmpeg_exe: str
+    image_path: Path
+    duration: float
+    out_path: Path
+    fps: int
+    width: int
+    height: int
+    zoom_intensity: float
+    fade_duration: float
+    use_nvenc: bool
+    effect: str
+    easing: str = "linear"    # "linear" | "ease_in" | "ease_out"
+    hold_frames: int = 0      # cliffhanger static-freeze appended after motion
+
+
 def _zoompan_filter(
     effect: str,
     n_frames: int,
@@ -293,84 +311,83 @@ def _zoompan_filter(
     width: int,
     height: int,
     zoom_intensity: float,
+    easing: str = "linear",
 ) -> str:
+    """
+    Absolute-expression zoompan (no incremental zoom+step accumulation).
+    on is 1-indexed in zoompan, so on/N goes from 1/N to 1.0 over the clip.
+    Easing shapes the progress curve without changing start/end zoom values.
+    """
     zi = zoom_intensity
-    step = zi / max(n_frames, 1)
+    N = max(n_frames, 1)
 
-    if effect in ("zoom_in", "zoom_in_slow"):
-        z = f"min(zoom+{step:.7f},{1 + zi:.5f})"
+    # Easing progress: p goes from ~0 (frame 1) to 1.0 (frame N)
+    if easing == "ease_in":
+        p = f"pow(on/{N},2.6)"        # slow start, rapid acceleration
+    elif easing == "ease_out":
+        p = f"(1-pow(1-on/{N},2.0))"  # fast start, decelerates to final
+    else:
+        p = f"on/{N}"                  # linear
+
+    if effect in ("zoom_in", "zoom_in_slow", "zoom_in_center"):
+        z_end = 1.0 + zi
+        z = f"min(1.0+{zi:.5f}*{p},{z_end:.5f})"
         x = "trunc(iw/2-(iw/zoom/2))"
-        y = "trunc(ih/2-(ih/zoom/2))"
-    elif effect == "zoom_in_center":
-        z = f"min(zoom+{step:.7f},{1 + zi:.5f})"
-        x = "trunc(iw/2-(iw/zoom/2))"
-        y = "trunc(ih/2-(ih/zoom/2)+(ih*0.05))"  # slightly lower — center on face
+        y = ("trunc(ih/2-(ih/zoom/2)+(ih*0.05))"
+             if effect == "zoom_in_center"
+             else "trunc(ih/2-(ih/zoom/2))")
     elif effect in ("zoom_out", "zoom_out_slow"):
-        z = f"if(eq(on,1),{1 + zi:.5f},max(zoom-{step:.7f},1))"
+        z_start = 1.0 + zi
+        z = f"max({z_start:.5f}-{zi:.5f}*{p},1.0)"
         x = "trunc(iw/2-(iw/zoom/2))"
         y = "trunc(ih/2-(ih/zoom/2))"
-    elif effect == "pan_left":
-        z = f"{1 + zi * 0.5:.5f}"
-        x = f"trunc((iw-iw/zoom)*on/{n_frames})"
-        y = "trunc(ih/2-(ih/zoom/2))"
-    elif effect == "pan_right":
-        z = f"{1 + zi * 0.5:.5f}"
-        x = f"trunc((iw-iw/zoom)*(1-on/{n_frames}))"
-        y = "trunc(ih/2-(ih/zoom/2))"
-    elif effect == "pan_down":
-        z = f"{1 + zi * 0.5:.5f}"
-        x = "trunc(iw/2-(iw/zoom/2))"
-        y = f"trunc((ih-ih/zoom)*on/{n_frames})"
-    elif effect == "pan_up":
-        z = f"{1 + zi * 0.5:.5f}"
-        x = "trunc(iw/2-(iw/zoom/2))"
-        y = f"trunc((ih-ih/zoom)*(1-on/{n_frames}))"
-    elif effect == "drift_diagonal":
-        z = f"min(zoom+{step * 0.6:.7f},{1 + zi * 0.8:.5f})"
-        x = f"trunc(iw/2-(iw/zoom/2)+(iw*0.04)*on/{n_frames})"
-        y = f"trunc(ih/2-(ih/zoom/2)+(ih*0.04)*on/{n_frames})"
-    else:  # static
+    else:  # static (and any unmapped motion)
         z = "1"
         x = "0"
         y = "0"
 
-    return f"zoompan=z='{z}':x='{x}':y='{y}':d={n_frames}:s={width}x{height}:fps={fps}"
+    return f"zoompan=z='{z}':x='{x}':y='{y}':d={N}:s={width}x{height}:fps={fps}"
 
 
-def _render_panel_clip(args: tuple) -> Path:
+def _render_panel_clip(job: _ClipJob) -> Path:
     """Render one image to a temp video clip via ffmpeg zoompan (runs in thread pool)."""
-    (ffmpeg_exe, image_path, duration, out_path,
-     fps, width, height, zoom_intensity, fade_duration, use_nvenc, effect) = args
-
-    n_frames = max(1, round(fps * duration))
-    zp = _zoompan_filter(effect, n_frames, fps, width, height, zoom_intensity)
+    n_frames = max(1, round(job.fps * job.duration))
+    zp = _zoompan_filter(
+        job.effect, n_frames, job.fps,
+        job.width, job.height, job.zoom_intensity, job.easing,
+    )
 
     vf_parts = [zp]
-    if fade_duration > 0 and n_frames > round(fps * fade_duration * 2):
-        fade_n = round(fps * fade_duration)
-        vf_parts.append(f"fade=t=in:st=0:d={fade_n / fps:.4f}")
-        vf_parts.append(f"fade=t=out:st={(n_frames - fade_n) / fps:.4f}:d={fade_n / fps:.4f}")
+    if job.fade_duration > 0 and n_frames > round(job.fps * job.fade_duration * 2):
+        fade_n = round(job.fps * job.fade_duration)
+        vf_parts.append(f"fade=t=in:st=0:d={fade_n / job.fps:.4f}")
+        vf_parts.append(f"fade=t=out:st={(n_frames - fade_n) / job.fps:.4f}:d={fade_n / job.fps:.4f}")
+    # Cliffhanger: freeze last frame for hold_frames after Ken Burns finishes
+    if job.hold_frames > 0:
+        vf_parts.append(f"tpad=stop_mode=clone:stop={job.hold_frames}")
     vf = ",".join(vf_parts)
 
-    if use_nvenc:
+    total_frames = n_frames + job.hold_frames
+
+    if job.use_nvenc:
         codec_args = ["-c:v", "h264_nvenc", "-preset", "p1", "-b:v", "8M"]
     else:
         codec_args = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "18"]
 
     cmd = [
-        ffmpeg_exe, "-y",
-        "-loop", "1", "-framerate", str(fps),
-        "-i", str(image_path),
+        job.ffmpeg_exe, "-y",
+        "-loop", "1", "-framerate", str(job.fps),
+        "-i", str(job.image_path),
         "-vf", vf,
-        "-frames:v", str(n_frames),  # exact frame count — no rounding drift
+        "-frames:v", str(total_frames),
         *codec_args,
         "-an", "-pix_fmt", "yuv420p",
-        str(out_path),
+        str(job.out_path),
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f"Clip render failed ({image_path.name}):\n{r.stderr[-800:]}")
-    return out_path
+        raise RuntimeError(f"Clip render failed ({job.image_path.name}):\n{r.stderr[-800:]}")
+    return job.out_path
 
 
 def _verify_audio_stream(video_path: Path) -> bool:
@@ -425,6 +442,7 @@ class VideoAssembler:
             config=self.config.as_dict(),
             preview_mode=preview_mode,
             sentence_count=len(segments),
+            script_path=self.paths.panel_script_file,
         )
 
 
@@ -438,6 +456,7 @@ def assemble_video(
     config: dict,
     preview_mode: bool = False,
     sentence_count: int = 0,
+    script_path: Optional[Path] = None,
 ) -> Path:
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     width = config["video_width"]
@@ -490,29 +509,76 @@ def assemble_video(
         except Exception:
             pass
 
-    def _pick_effect(img_path: Path, subclip_idx: int = 0) -> str:
-        # Subclips 2+ rotate through a fixed sequence so repeated panels look different
+    # ---- Style engine: per-panel (effect, easing, hold_frames) ----------------
+    try:
+        from engines.recap_style_engine import (
+            CLASSIFIER_LABEL_MAP, PanelCategory, detect_cliffhanger,
+            snap_frames as _snap_frames, FPS as _STYLE_FPS,
+        )
+        _style_ok = True
+    except ImportError:
+        _style_ok = False
+
+    # Per-category: (effect, easing)
+    _CAT_MOTION = {
+        PanelCategory.DIALOGUE_HOLD:   ("zoom_in",  "linear"),
+        PanelCategory.ACTION_ZOOM:     ("zoom_in",  "ease_in"),
+        PanelCategory.ESTABLISHING_PAN:("zoom_out", "ease_out"),
+        PanelCategory.IMPACT_FLASH:    ("static",   "linear"),
+    } if _style_ok else {}
+
+    # Load script text for cliffhanger phrase detection
+    script_texts: List[str] = []
+    if _style_ok and script_path and script_path.exists():
+        try:
+            sd = json.loads(script_path.read_text(encoding="utf-8"))
+            script_texts = [e.get("narration", "") for e in sd]
+        except Exception:
+            pass
+
+    def _pick_clip_params(img_path: Path, pair_idx: int, subclip_idx: int):
+        """Return (effect, easing, hold_frames) for this clip."""
+        hold = 0
+        # Cliffhanger: last panel of script, or phrase match
+        if _style_ok and script_texts:
+            txt = script_texts[pair_idx] if pair_idx < len(script_texts) else ""
+            if detect_cliffhanger(txt) or pair_idx == len(script_texts) - 1:
+                hold = _snap_frames(2.0)  # 60 frames @ 30fps
+
+        # Subclips 2+ get rotation so same panel doesn't repeat same Ken Burns
         if subclip_idx > 0:
-            return _SUBCLIP_ROTATION[(subclip_idx - 1) % len(_SUBCLIP_ROTATION)]
-        # First (or only) clip: prefer content-aware motion, remapped to smooth zoom
+            return _SUBCLIP_ROTATION[(subclip_idx - 1) % len(_SUBCLIP_ROTATION)], "linear", hold
+
+        # Content-aware effect + easing from style engine
+        if _style_ok and motion_map:
+            try:
+                panel_num = int(img_path.stem.split("-")[0])
+                map_entry = motion_map.get(str(panel_num), {})
+                cat_label = map_entry.get("category", "")
+                cat = CLASSIFIER_LABEL_MAP.get(cat_label)
+                if cat and cat in _CAT_MOTION:
+                    eff, eas = _CAT_MOTION[cat]
+                    return eff, eas, hold
+            except (ValueError, IndexError):
+                pass
+
+        # Fallback: content-map motion remapped to zoom, linear easing
         try:
             panel_num = int(img_path.stem.split("-")[0])
             entry = motion_map.get(str(panel_num))
             if entry and entry.get("motion") in ALL_MOTIONS:
-                return _PAN_TO_ZOOM.get(entry["motion"], "zoom_in")
+                return _PAN_TO_ZOOM.get(entry["motion"], "zoom_in"), "linear", hold
         except (ValueError, IndexError):
             pass
-        return random.choices(EFFECT_TYPES, weights=EFFECT_WEIGHTS, k=1)[0]
 
-    # Detect consecutive same-panel runs (subclip splits) to assign distinct effects
+        return random.choices(EFFECT_TYPES, weights=EFFECT_WEIGHTS, k=1)[0], "linear", hold
+
+    # Detect consecutive same-panel runs (subclip splits)
     prev_path = None
-    subclip_counters: list[int] = []
     sc_idx = 0
+    subclip_counters: List[int] = []
     for img, _ in pairs:
-        if img == prev_path:
-            sc_idx += 1
-        else:
-            sc_idx = 0
+        sc_idx = (sc_idx + 1) if img == prev_path else 0
         subclip_counters.append(sc_idx)
         prev_path = img
 
@@ -520,24 +586,30 @@ def assemble_video(
     temp_dir = output_path.parent / "_temp_clips"
     temp_dir.mkdir(exist_ok=True)
 
-    render_args = [
-        (ffmpeg_exe, img, dur, temp_dir / f"clip_{i:04d}.mp4",
-         fps, width, height, zoom_intensity, fade_duration, use_nvenc,
-         _pick_effect(img, subclip_counters[i]))
-        for i, (img, dur) in enumerate(pairs)
-    ]
-    clip_paths = [temp_dir / f"clip_{i:04d}.mp4" for i in range(len(pairs))]
+    clip_jobs: List[_ClipJob] = []
+    for i, (img, dur) in enumerate(pairs):
+        eff, eas, hold = _pick_clip_params(img, i, subclip_counters[i])
+        clip_jobs.append(_ClipJob(
+            ffmpeg_exe=ffmpeg_exe, image_path=img, duration=dur,
+            out_path=temp_dir / f"clip_{i:04d}.mp4",
+            fps=fps, width=width, height=height,
+            zoom_intensity=zoom_intensity, fade_duration=fade_duration,
+            use_nvenc=use_nvenc, effect=eff, easing=eas, hold_frames=hold,
+        ))
+    clip_paths = [j.out_path for j in clip_jobs]
     max_workers = NVENC_MAX_WORKERS if use_nvenc else (os.cpu_count() or 4)
-    logger.info(f"  Rendering {len(pairs)} clips ({max_workers} parallel workers)...")
+    if _style_ok and motion_map:
+        logger.info("  Style engine active (easing + cliffhanger detection)")
+    logger.info(f"  Rendering {len(clip_jobs)} clips ({max_workers} parallel workers)...")
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futs = {pool.submit(_render_panel_clip, a): i for i, a in enumerate(render_args)}
+        futs = {pool.submit(_render_panel_clip, j): i for i, j in enumerate(clip_jobs)}
         done = 0
         log_every = max(1, len(pairs) // 10)
         for fut in concurrent.futures.as_completed(futs):
             fut.result()
             done += 1
-            if done % log_every == 0 or done == len(pairs):
+            if done % log_every == 0 or done == len(clip_jobs):
                 logger.info(f"  Rendered {done}/{len(pairs)} clips")
 
     # Concat list — use filename only; ffmpeg resolves relative to concat.txt's directory
