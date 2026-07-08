@@ -300,8 +300,10 @@ class _ClipJob:
     fade_duration: float
     use_nvenc: bool
     effect: str
-    easing: str = "linear"    # "linear" | "ease_in" | "ease_out"
-    hold_frames: int = 0      # cliffhanger static-freeze appended after motion
+    easing: str = "linear"      # "linear" | "ease_in" | "ease_out"
+    hold_frames: int = 0        # cliffhanger static-freeze appended after motion
+    white_flash: bool = False   # ACTION: white overlay fading out over first 0.15s
+    screen_shake: bool = False  # ACTION: sine-wave translate for first 0.30s
 
 
 def _zoompan_filter(
@@ -358,10 +360,36 @@ def _render_panel_clip(job: _ClipJob) -> Path:
     )
 
     vf_parts = [zp]
-    if job.fade_duration > 0 and n_frames > round(job.fps * job.fade_duration * 2):
+
+    # White flash: `fade from white` replaces normal fade-in for action panels.
+    # fade=t=in:color=white fades FROM white into the clip over flash_dur seconds.
+    if job.white_flash:
+        flash_dur = round(job.fps * 0.15)  # 4–5 frames @ 30fps
+        vf_parts.append(f"fade=t=in:st=0:d={flash_dur / job.fps:.4f}:color=white")
+    elif job.fade_duration > 0 and n_frames > round(job.fps * job.fade_duration * 2):
         fade_n = round(job.fps * job.fade_duration)
         vf_parts.append(f"fade=t=in:st=0:d={fade_n / job.fps:.4f}")
+
+    # Normal fade-out (all panels including action)
+    if job.fade_duration > 0 and n_frames > round(job.fps * job.fade_duration * 2):
+        fade_n = round(job.fps * job.fade_duration)
         vf_parts.append(f"fade=t=out:st={(n_frames - fade_n) / job.fps:.4f}:d={fade_n / job.fps:.4f}")
+
+    # Screen shake: pad frame by 2*amp each side, then crop with sine-wave offset.
+    # Uses sin/cos so the shake is visually random without ffmpeg's random() quirks.
+    if job.screen_shake:
+        s_frames = max(2, round(job.fps * 0.30))  # 9 frames @ 30fps
+        amp = 4  # pixels of max displacement
+        pad = amp * 2
+        vf_parts += [
+            f"pad={job.width + pad}:{job.height + pad}:{amp}:{amp}",
+            (
+                f"crop={job.width}:{job.height}"
+                f":x='{amp}+if(lt(n,{s_frames}),round({amp}*sin(n*1.3)),0)'"
+                f":y='{amp}+if(lt(n,{s_frames}),round({amp}*cos(n*1.7)),0)'"
+            ),
+        ]
+
     # Cliffhanger: freeze last frame for hold_frames after Ken Burns finishes
     if job.hold_frames > 0:
         vf_parts.append(f"tpad=stop_mode=clone:stop={job.hold_frames}")
@@ -443,6 +471,7 @@ class VideoAssembler:
             preview_mode=preview_mode,
             sentence_count=len(segments),
             script_path=self.paths.panel_script_file,
+            vo_segments=segments,
         )
 
 
@@ -457,6 +486,7 @@ def assemble_video(
     preview_mode: bool = False,
     sentence_count: int = 0,
     script_path: Optional[Path] = None,
+    vo_segments=None,   # List[TimestampSegment] for BGM ducking; None = flat volume
 ) -> Path:
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     width = config["video_width"]
@@ -520,11 +550,12 @@ def assemble_video(
         _style_ok = False
 
     # Per-category: (effect, easing)
+    # (effect, easing, white_flash, screen_shake)
     _CAT_MOTION = {
-        PanelCategory.DIALOGUE_HOLD:   ("zoom_in",  "linear"),
-        PanelCategory.ACTION_ZOOM:     ("zoom_in",  "ease_in"),
-        PanelCategory.ESTABLISHING_PAN:("zoom_out", "ease_out"),
-        PanelCategory.IMPACT_FLASH:    ("static",   "linear"),
+        PanelCategory.DIALOGUE_HOLD:    ("zoom_in",  "linear",   False, False),
+        PanelCategory.ACTION_ZOOM:      ("zoom_in",  "ease_in",  True,  True),
+        PanelCategory.ESTABLISHING_PAN: ("zoom_out", "ease_out", False, False),
+        PanelCategory.IMPACT_FLASH:     ("static",   "linear",   True,  False),
     } if _style_ok else {}
 
     # Load script text for cliffhanger phrase detection
@@ -545,11 +576,11 @@ def assemble_video(
             if detect_cliffhanger(txt) or pair_idx == len(script_texts) - 1:
                 hold = _snap_frames(2.0)  # 60 frames @ 30fps
 
-        # Subclips 2+ get rotation so same panel doesn't repeat same Ken Burns
+        # Subclips 2+ rotate effect; no FX (flash/shake on first subclip only)
         if subclip_idx > 0:
-            return _SUBCLIP_ROTATION[(subclip_idx - 1) % len(_SUBCLIP_ROTATION)], "linear", hold
+            return _SUBCLIP_ROTATION[(subclip_idx - 1) % len(_SUBCLIP_ROTATION)], "linear", hold, False, False
 
-        # Content-aware effect + easing from style engine
+        # Content-aware effect + easing + FX from style engine
         if _style_ok and motion_map:
             try:
                 panel_num = int(img_path.stem.split("-")[0])
@@ -557,21 +588,21 @@ def assemble_video(
                 cat_label = map_entry.get("category", "")
                 cat = CLASSIFIER_LABEL_MAP.get(cat_label)
                 if cat and cat in _CAT_MOTION:
-                    eff, eas = _CAT_MOTION[cat]
-                    return eff, eas, hold
+                    eff, eas, wf, ss = _CAT_MOTION[cat]
+                    return eff, eas, hold, wf, ss
             except (ValueError, IndexError):
                 pass
 
-        # Fallback: content-map motion remapped to zoom, linear easing
+        # Fallback: content-map motion remapped to zoom, linear easing, no FX
         try:
             panel_num = int(img_path.stem.split("-")[0])
             entry = motion_map.get(str(panel_num))
             if entry and entry.get("motion") in ALL_MOTIONS:
-                return _PAN_TO_ZOOM.get(entry["motion"], "zoom_in"), "linear", hold
+                return _PAN_TO_ZOOM.get(entry["motion"], "zoom_in"), "linear", hold, False, False
         except (ValueError, IndexError):
             pass
 
-        return random.choices(EFFECT_TYPES, weights=EFFECT_WEIGHTS, k=1)[0], "linear", hold
+        return random.choices(EFFECT_TYPES, weights=EFFECT_WEIGHTS, k=1)[0], "linear", hold, False, False
 
     # Detect consecutive same-panel runs (subclip splits)
     prev_path = None
@@ -588,13 +619,14 @@ def assemble_video(
 
     clip_jobs: List[_ClipJob] = []
     for i, (img, dur) in enumerate(pairs):
-        eff, eas, hold = _pick_clip_params(img, i, subclip_counters[i])
+        eff, eas, hold, wf, ss = _pick_clip_params(img, i, subclip_counters[i])
         clip_jobs.append(_ClipJob(
             ffmpeg_exe=ffmpeg_exe, image_path=img, duration=dur,
             out_path=temp_dir / f"clip_{i:04d}.mp4",
             fps=fps, width=width, height=height,
             zoom_intensity=zoom_intensity, fade_duration=fade_duration,
             use_nvenc=use_nvenc, effect=eff, easing=eas, hold_frames=hold,
+            white_flash=wf, screen_shake=ss,
         ))
     clip_paths = [j.out_path for j in clip_jobs]
     max_workers = NVENC_MAX_WORKERS if use_nvenc else (os.cpu_count() or 4)
@@ -629,11 +661,19 @@ def assemble_video(
     if has_music:
         cmd += ["-stream_loop", "-1", "-i", str(music_path)]
 
-    # Audio filter
+    # Audio filter — BGM ducking if style engine + VO segment times are available
     if has_music:
+        try:
+            from engines.recap_style_engine import build_duck_volume_expr
+            duck_expr = build_duck_volume_expr(
+                [(s.start, s.end) for s in vo_segments]
+            ) if vo_segments else f"volume={bg_music_volume}"
+            logger.info("  BGM ducking active (-8dB under voiceover)")
+        except Exception:
+            duck_expr = f"volume={bg_music_volume}"
         af = (
             f"[1:a]volume={voiceover_volume}[vo];"
-            f"[2:a]volume={bg_music_volume},"
+            f"[2:a]{duck_expr},"
             f"atrim=duration={total_duration:.3f}[bg];"
             f"[vo][bg]amix=inputs=2:duration=first[aout]"
         )
